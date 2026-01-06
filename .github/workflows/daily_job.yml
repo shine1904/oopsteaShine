@@ -24,8 +24,8 @@ jobs:
       - name: Run Scraper Job
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ASSISTANT_ID: ${{ secrets.ASSISTANT_ID }}
           VECTOR_STORE_ID: ${{ secrets.VECTOR_STORE_ID }}
+          ASSISTANT_ID: ${{ secrets.ASSISTANT_ID }}
         run: python main.py
 
       - name: Commit changes (Metadata & Map)
@@ -34,4 +34,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add scrape_metadata.json url_map.json
           git commit -m "Auto-update metadata [skip ci]" || echo "No changes to commit"
+
           git push
