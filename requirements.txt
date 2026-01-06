@@ -1,0 +1,8 @@
+openai==1.55.3
+python-dotenv
+requests
+beautifulsoup4
+markdownify
+lxml
+streamlit   
+boto3

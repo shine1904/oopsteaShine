@@ -1,0 +1,37 @@
+name: Daily Scraper Job
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Chạy 0h mỗi ngày
+  workflow_dispatch: # Cho phép bấm nút chạy thử thủ công
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Scraper Job
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ASSISTANT_ID: ${{ secrets.ASSISTANT_ID }}
+          VECTOR_STORE_ID: ${{ secrets.VECTOR_STORE_ID }}
+        run: python main.py
+
+      - name: Commit changes (Metadata & Map)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add scrape_metadata.json url_map.json
+          git commit -m "Auto-update metadata [skip ci]" || echo "No changes to commit"
+          git push
