@@ -1,0 +1,82 @@
+📘 OptiShine: Technical Architecture & System Logic
+This document presents detailed technical solutions implemented in the OptiShine system, from raw data processing to intelligent AI response mechanisms.
+
+1. Scraper & Sync Logic
+Instead of using traditional HTML Crawl methods that are prone to errors when interfaces change, the system uses direct connection through the Zendesk Help Center API.
+Data Extraction: Only articles in published status are retrieved to ensure accuracy.
+Markdown Conversion: Uses markdownify to convert HTML to Markdown. This removes excess CSS/JS code while preserving semantic structure (headers #, ##, bold **, etc.), helping the Embedding model work more efficiently.
+Delta Detection (MD5 Hashing): Each article is assigned an MD5 hash code based on its content. The system compares this hash with old data in scrape_metadata.json. If the hash is unchanged, the system skips processing to save time and avoid unnecessary OpenAI API calls.
+
+2. Advanced Chunking Logic
+This is the most critical step for optimizing RAG. Rather than splitting by fixed character count, we split by Document Structure (Recursive Heading Splitting).
+Smart Break Points: The system identifies ## (Heading 2) tags as chunk boundaries. This ensures each chunk contains a complete subsection of the guide.
+Metadata Tagging: Each chunk automatically inserts information at the beginning: Source: [Article Title] | URL: [Original Link]. This ensures that even when viewed independently, the text passage carries full context for AI.
+Quantity Optimization: With 100 articles, the system generates 461 chunks, ensuring each segment is short enough that AI isn't confused by information overload, yet long enough to contain a complete meaning.
+
+3. Main Orchestrator Logic
+The main.py file serves as the "Orchestrator" (Conductor) connecting independent components:
+Initialization: Establishes connections with OpenAI Assistant and Vector Store.
+State Comparison: Reads existing url_map.json to identify which files already exist on OpenAI.
+Flow Processing: If an article is identified as "new" or "needs update," it goes through the process: Scrape → Chunk → Upload → Attach to Vector Store.
+Cleanup: Deletes intermediate files on the virtual machine to ensure security and optimize memory.
+
+4. Auto Update Daily Job Logic
+The system operates without manual intervention thanks to GitHub Actions CI/CD.
+Trigger (Cron Job): Configuration 0 0 * * * causes the system to automatically run at 0:00 UTC every day.
+Secure Environment: API keys are managed through GitHub Secrets (OOPS), ensuring sensitive information doesn't leak into code.
+Persistence (State Storage): After the job completes, the virtual machine executes git commit and git push back to the repo. This ensures metadata files (url_map.json, scrape_metadata.json) are always updated for the next day's run.
+
+5. Response Logic
+This logic is configured in the Assistant's System Prompt to guide behavior:
+Strict Context: AI is only allowed to answer based on the 461 existing chunks. If no information is found, the Bot must respond "I don't have that information" rather than guessing.
+Citation Mapping: When information is found, AI retrieves the File ID of that chunk. The front-end uses this File ID to cross-reference with url_map.json to display the OptiSigns URL link directly below the answer.
+
+6. Front-end Configuration (UI/UX Logic)
+The Streamlit application manages the user interface according to these principles:
+Chat History Persistence: Uses st.session_state to store conversation history, allowing users to ask follow-up questions while AI remembers previous context.
+Streaming UI: Responses are displayed as "Streaming" (character by character) creating a smooth feeling and reducing psychological latency for users.
+Markdown Rendering: Supports displaying guides as Lists, Bold text, or Code Blocks so users can easily follow technical steps.
+Link daily job logs: https://github.com/shine1904/oopsteaShine/actions
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`
+📘 OptiShine: Technical Architecture & System Logic
+Tài liệu này trình bày chi tiết các giải pháp kỹ thuật được triển khai trong hệ thống OptiShine, từ quy trình xử lý dữ liệu thô đến cơ chế phản hồi thông minh của AI.
+
+1. Logic Cào bài & Đồng bộ (Scraper & Sync Logic)
+Thay vì sử dụng phương pháp Crawl HTML truyền thống dễ bị lỗi khi giao diện thay đổi, hệ thống sử dụng kết nối trực tiếp qua Zendesk Help Center API.
+Trích xuất dữ liệu: Chỉ lấy các bài viết ở trạng thái published để đảm bảo tính chính xác.
+Chuyển đổi Markdown: Sử dụng markdownify để chuyển đổi HTML sang Markdown. Việc này giúp loại bỏ các mã CSS/JS thừa, giữ lại cấu trúc ngữ nghĩa (Semantics) như #, ##, **, giúp mô hình Embedding hoạt động hiệu quả hơn.
+Delta Detection (MD5 Hashing): Mỗi bài viết được gán một mã băm MD5 dựa trên nội dung. Hệ thống so sánh mã băm này với dữ liệu cũ trong scrape_metadata.json. Nếu mã băm không đổi, hệ thống sẽ bỏ qua để tiết kiệm thời gian và hạn chế gọi API OpenAI vô ích.
+
+2. Logic Chia nhỏ dữ liệu chuyên sâu (Advanced Chunking Logic)
+Đây là bước quan trọng nhất để tối ưu hóa RAG. Chúng ta không chia theo số lượng ký tự cố định mà chia theo Cấu trúc tài liệu (Recursive Heading Splitting).
+Điểm ngắt thông minh: Hệ thống nhận diện các thẻ ## (Heading 2) làm ranh giới tách chunk. Điều này đảm bảo mỗi chunk chứa trọn vẹn một tiểu mục hướng dẫn.
+Gắn thẻ Metadata: Mỗi chunk được tự động chèn thêm thông tin vào đầu văn bản: Source: [Tiêu đề bài viết] | URL: [Link gốc]. Việc này đảm bảo ngay cả khi đứng độc lập, đoạn văn bản đó vẫn mang đầy đủ ngữ cảnh cho AI.
+Tối ưu hóa số lượng: Với 100 bài viết, hệ thống tạo ra 461 chunks, đảm bảo mỗi đoạn đủ ngắn để AI không bị nhiễu thông tin nhưng đủ dài để chứa trọn vẹn một ý nghĩa.
+
+3. Logic File Điều phối chính (Main Logic)
+File main.py đóng vai trò là "Orchestrator" (Nhạc trưởng) kết nối các thành phần độc lập:
+Khởi tạo: Thiết lập kết nối với OpenAI Assistant và Vector Store.
+So sánh trạng thái: Đọc file url_map.json hiện có để xác định những file nào đã tồn tại trên OpenAI.
+Xử lý luồng: Nếu một bài viết được xác định là "mới" hoặc "cần cập nhật", nó sẽ đi qua quy trình: Scrape -> Chunk -> Upload -> Attach to Vector Store.
+Dọn dẹp: Xóa các file trung gian trên máy ảo để bảo mật và tối ưu bộ nhớ.
+
+4. Logic Tự động hóa (Auto Update Daily Job Logic)
+Hệ thống vận hành không cần con người can thiệp nhờ GitHub Actions CI/CD.
+Trigger (Cron Job): Cấu hình 0 0 * * * giúp hệ thống tự chạy vào 0h UTC hàng ngày.
+Môi trường bảo mật: Các khóa API được quản lý qua GitHub Secrets (OOPS), đảm bảo không lộ thông tin nhạy cảm trong code.
+Persistence (Lưu trữ trạng thái): Sau khi Job hoàn thành, máy ảo sẽ thực hiện lệnh git commit và git push ngược lại repo. Điều này giúp các file Metadata (url_map.json, scrape_metadata.json) luôn được cập nhật cho lần chạy của ngày tiếp theo.
+
+5. Logic Câu trả lời (Response Logic)
+Logic này được cấu hình trong phần System Prompt của Assistant để định hướng hành vi:
+Strict Context: AI chỉ được phép trả lời dựa trên 461 chunks có sẵn. Nếu không tìm thấy, Bot phải báo "Tôi không có thông tin" thay vì suy đoán.
+Citation Mapping: Khi tìm thấy thông tin, AI sẽ lấy File ID của chunk đó. Front-end sẽ dùng File ID này đối chiếu với url_map.json để hiển thị link URL của OptiSigns ngay dưới câu trả lời.
+
+6. Cấu hình Front-end (UI/UX Logic)
+Ứng dụng Streamlit xử lý giao diện người dùng theo các nguyên tắc:
+Chat History Persistence: Sử dụng st.session_state để lưu trữ lịch sử cuộc hội thoại, cho phép người dùng hỏi các câu kế tiếp mà AI vẫn nhớ ngữ cảnh trước đó.
+Streaming UI: Câu trả lời được hiển thị dạng "Streaming" (từng chữ một) tạo cảm giác mượt mà và giảm độ trễ tâm lý cho người dùng.
+Markdown Rendering: Hỗ trợ hiển thị các bước hướng dẫn dưới dạng List, Bold, hoặc Code Block để người dùng dễ theo dõi thao tác kỹ thuật.
+Đây là hướng dẫn chi tiết và đầy đủ nhất để đóng gói và triển khai giao diện Web (Streamlit) của bạn bằng Docker. Việc sử dụng Docker giúp đảm bảo ứng dụng chạy ổn định trên mọi môi trường mà không gặp lỗi thiếu thư viện.
